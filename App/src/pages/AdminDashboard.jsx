@@ -1,16 +1,20 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useIssues, CATEGORIES } from '../context/IssueContext';
+import { db } from '../firebase';
+import { collection, query, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 /* ── helpers ── */
 function fmtDate(dateStr) {
     if (!dateStr) return '';
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+    const date = dateStr?.toDate ? dateStr.toDate() : new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
 }
 function timeAgo(dateStr) {
     if (!dateStr) return '';
-    const diff = Date.now() - new Date(dateStr).getTime();
+    const date = dateStr?.toDate ? dateStr.toDate() : new Date(dateStr);
+    const diff = Date.now() - date.getTime();
     const hrs = Math.floor(diff / 3600000);
     if (hrs < 1) return 'just now';
     if (hrs < 24) return `${hrs}h ago`;
@@ -33,6 +37,37 @@ const AdminDashboard = () => {
     const [activeFilter, setActiveFilter] = useState('all');
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [resolveConfirm, setResolveConfirm] = useState(null);
+
+    // Flag reports state
+    const [reports, setReports] = useState([]);
+    const [loadingReports, setLoadingReports] = useState(true);
+    const [activeReportFilter, setActiveReportFilter] = useState('pending'); // 'all', 'pending', 'resolved'
+    const [reportToDelete, setReportToDelete] = useState(null); // { reportId, targetId }
+    const [reportToDismiss, setReportToDismiss] = useState(null); // reportId
+
+    // Fetch flag reports in real-time
+    useEffect(() => {
+        const q = query(collection(db, 'reports'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const reportsData = [];
+            snapshot.forEach((doc) => {
+                reportsData.push({ id: doc.id, ...doc.data() });
+            });
+            // Sort by createdAt descending
+            reportsData.sort((a, b) => {
+                const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+                const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+                return dateB - dateA;
+            });
+            setReports(reportsData);
+            setLoadingReports(false);
+        }, (error) => {
+            console.error("Error loading reports:", error);
+            setLoadingReports(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
 
     /* ── Access guard ── */
     const isAdmin = userProfile?.role === 'admin' || currentUser?.role === 'admin';
@@ -81,6 +116,12 @@ const AdminDashboard = () => {
         return issues.filter(i => i.status === activeFilter);
     }, [issues, activeFilter]);
 
+    /* ── Filtered reports ── */
+    const filteredReports = useMemo(() => {
+        if (activeReportFilter === 'all') return reports;
+        return reports.filter(r => r.status === activeReportFilter);
+    }, [reports, activeReportFilter]);
+
     /* ── Actions ── */
     const handleResolve = (issueId) => {
         updateIssueStatus(issueId, 'resolved');
@@ -94,10 +135,33 @@ const AdminDashboard = () => {
         setDeleteConfirm(null);
     };
 
+    // Flag report actions
+    const handleResolveReportAndDeleteIssue = async (reportId, issueId) => {
+        try {
+            await deleteIssue(issueId);
+            const reportRef = doc(db, 'reports', reportId);
+            await updateDoc(reportRef, { status: 'resolved' });
+        } catch (error) {
+            console.error("Error resolving report and deleting issue:", error);
+        }
+        setReportToDelete(null);
+    };
+
+    const handleDismissReport = async (reportId) => {
+        try {
+            const reportRef = doc(db, 'reports', reportId);
+            await updateDoc(reportRef, { status: 'resolved' });
+        } catch (error) {
+            console.error("Error dismissing report:", error);
+        }
+        setReportToDismiss(null);
+    };
+
     /* ── TABS ── */
+    const pendingReportsCount = reports.filter(r => r.status === 'pending').length;
     const tabs = [
         { id: 'overview', label: 'Overview', icon: 'grid_view' },
-        { id: 'reports',  label: 'Reports',  icon: 'flag', badge: stats.open },
+        { id: 'reports',  label: 'Flag Reports',  icon: 'flag', badge: pendingReportsCount },
         { id: 'analytics', label: 'Analytics', icon: 'bar_chart' },
     ];
 
@@ -112,7 +176,7 @@ const AdminDashboard = () => {
                             <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 28, color: '#ef4444' }}>delete</span>
                             </div>
-                            <h3 style={{ color: '#fff', fontWeight: 800, margin: 0, fontSize: '1.1rem' }}>Delete Report?</h3>
+                            <h3 style={{ color: '#fff', fontWeight: 800, margin: 0, fontSize: '1.1rem' }}>Delete Issue?</h3>
                             <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: 0 }}>This action cannot be undone.</p>
                         </div>
                         <div style={{ display: 'flex', gap: 12 }}>
@@ -137,6 +201,44 @@ const AdminDashboard = () => {
                         <div style={{ display: 'flex', gap: 12 }}>
                             <button onClick={() => setResolveConfirm(null)} style={{ flex: 1, padding: '10px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#cbd5e1', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem' }}>Cancel</button>
                             <button onClick={() => handleResolve(resolveConfirm)} style={{ flex: 1, padding: '10px', borderRadius: 12, background: '#10B981', border: 'none', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem' }}>Resolve</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Flag Report Delete Modal ── */}
+            {reportToDelete && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}>
+                    <div style={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: 24, width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
+                            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 28, color: '#ef4444' }}>delete</span>
+                            </div>
+                            <h3 style={{ color: '#fff', fontWeight: 800, margin: 0, fontSize: '1.1rem' }}>Remove Listing?</h3>
+                            <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: 0 }}>This will delete the reported issue and mark the flag report as resolved.</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <button onClick={() => setReportToDelete(null)} style={{ flex: 1, padding: '10px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#cbd5e1', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem' }}>Cancel</button>
+                            <button onClick={() => handleResolveReportAndDeleteIssue(reportToDelete.reportId, reportToDelete.targetId)} style={{ flex: 1, padding: '10px', borderRadius: 12, background: '#ef4444', border: 'none', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem' }}>Remove & Resolve</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Flag Report Dismiss Modal ── */}
+            {reportToDismiss && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}>
+                    <div style={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: 24, width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
+                            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(73,145,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 28, color: '#4991ff' }}>info</span>
+                            </div>
+                            <h3 style={{ color: '#fff', fontWeight: 800, margin: 0, fontSize: '1.1rem' }}>Dismiss Flag?</h3>
+                            <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: 0 }}>This will mark the flag report as resolved and keep the listing active.</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <button onClick={() => setReportToDismiss(null)} style={{ flex: 1, padding: '10px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#cbd5e1', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem' }}>Cancel</button>
+                            <button onClick={() => handleDismissReport(reportToDismiss)} style={{ flex: 1, padding: '10px', borderRadius: 12, background: '#4991ff', border: 'none', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem' }}>Dismiss</button>
                         </div>
                     </div>
                 </div>
@@ -209,10 +311,10 @@ const AdminDashboard = () => {
                         {/* Stat cards */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                             {[
-                                { label: 'Total Reports', value: stats.total, color: '#4991ff', bg: '#4991ff15', icon: 'list_alt' },
-                                { label: 'Pending',       value: stats.open,  color: '#f59e0b', bg: '#f59e0b15', icon: 'pending_actions' },
-                                { label: 'In Progress',  value: stats.in_progress, color: '#60a5fa', bg: '#60a5fa15', icon: 'pending' },
-                                { label: 'Resolved',     value: stats.resolved,    color: '#10B981', bg: '#10B98115', icon: 'check_circle' },
+                                { label: 'Total Listings', value: stats.total, color: '#4991ff', bg: '#4991ff15', icon: 'list_alt' },
+                                { label: 'Pending Flags',  value: pendingReportsCount, color: '#ef4444', bg: '#ef444415', icon: 'flag' },
+                                { label: 'Active Issues',  value: stats.open + stats.in_progress, color: '#f59e0b', bg: '#f59e0b15', icon: 'pending_actions' },
+                                { label: 'Resolved Issues',value: stats.resolved,    color: '#10B981', bg: '#10B98115', icon: 'check_circle' },
                             ].map(s => (
                                 <div key={s.label} style={{ borderRadius: 16, padding: '16px', background: s.bg, border: `1px solid ${s.color}25`, display: 'flex', flexDirection: 'column', gap: 8 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -280,27 +382,26 @@ const AdminDashboard = () => {
                         {/* Section header */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#4991ff' }}>flag</span>
-                            <span style={{ color: '#fff', fontWeight: 800, fontSize: '1.05rem' }}>Reports</span>
-                            <span style={{ minWidth: 22, height: 22, borderRadius: 11, background: '#4991ff20', border: '1px solid #4991ff30', color: '#4991ff', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' }}>{filtered.length}</span>
+                            <span style={{ color: '#fff', fontWeight: 800, fontSize: '1.05rem' }}>Removal Flag Requests</span>
+                            <span style={{ minWidth: 22, height: 22, borderRadius: 11, background: '#ef444420', border: '1px solid #ef444430', color: '#ef4444', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' }}>{pendingReportsCount}</span>
                         </div>
 
                         {/* Filter pills */}
                         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
                             {[
-                                { id: 'all', label: 'All' },
-                                { id: 'open', label: 'Pending' },
-                                { id: 'in_progress', label: 'In Progress' },
+                                { id: 'all', label: 'All Reports' },
+                                { id: 'pending', label: 'Pending Action' },
                                 { id: 'resolved', label: 'Resolved' },
                             ].map(f => (
                                 <button
                                     key={f.id}
-                                    onClick={() => setActiveFilter(f.id)}
+                                    onClick={() => setActiveReportFilter(f.id)}
                                     style={{
                                         padding: '6px 14px',
                                         borderRadius: 20,
-                                        border: activeFilter === f.id ? '1px solid #4991ff' : '1px solid rgba(255,255,255,0.08)',
-                                        background: activeFilter === f.id ? '#4991ff20' : 'transparent',
-                                        color: activeFilter === f.id ? '#4991ff' : '#64748b',
+                                        border: activeReportFilter === f.id ? '1px solid #4991ff' : '1px solid rgba(255,255,255,0.08)',
+                                        background: activeReportFilter === f.id ? '#4991ff20' : 'transparent',
+                                        color: activeReportFilter === f.id ? '#4991ff' : '#64748b',
                                         fontWeight: 600,
                                         fontSize: '0.75rem',
                                         cursor: 'pointer',
@@ -312,75 +413,90 @@ const AdminDashboard = () => {
                             ))}
                         </div>
 
-                        {/* Report cards — two columns on wide screens, single on mobile */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-                            {filtered.map(issue => {
-                                const cfg = STATUS_CONFIG[issue.status] || STATUS_CONFIG.open;
-                                const category = CATEGORIES.find(c => c.id === issue.category);
-                                return (
-                                    <div key={issue.id} style={{ borderRadius: 16, background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                                        {/* Card header */}
-                                        <div style={{ padding: '12px 14px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                                            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: cfg.color, background: cfg.bg, padding: '3px 8px', borderRadius: 6, letterSpacing: '0.05em' }}>{cfg.label}</span>
-                                            <span style={{ fontSize: '0.72rem', color: '#475569', flexShrink: 0 }}>{fmtDate(issue.createdAt)}</span>
-                                        </div>
+                        {/* Loading State */}
+                        {loadingReports ? (
+                            <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
+                                <span className="material-symbols-outlined animate-spin" style={{ fontSize: 32, marginBottom: 8, display: 'block' }}>sync</span>
+                                Loading flag reports...
+                            </div>
+                        ) : (
+                            /* Report cards — two columns on wide screens, single on mobile */
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                                {filteredReports.map(report => {
+                                    const isPending = report.status === 'pending';
+                                    const reportColor = isPending ? '#ef4444' : '#10B981';
+                                    const reportBg = isPending ? '#ef444415' : '#10B98115';
+                                    return (
+                                        <div key={report.id} style={{ borderRadius: 16, background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                            {/* Card header */}
+                                            <div style={{ padding: '12px 14px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: reportColor, background: reportBg, padding: '3px 8px', borderRadius: 6, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                                                    {report.status || 'PENDING'}
+                                                </span>
+                                                <span style={{ fontSize: '0.72rem', color: '#475569', flexShrink: 0 }}>{fmtDate(report.createdAt)}</span>
+                                            </div>
 
-                                        {/* Card body */}
-                                        <div style={{ padding: '0 14px 10px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                                            {issue.imageURLs?.[0] && (
-                                                <img src={issue.imageURLs[0]} alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
-                                            )}
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <p style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.9rem', margin: '0 0 4px', lineHeight: 1.3 }}>{issue.title}</p>
-                                                <p style={{ color: '#475569', fontSize: '0.75rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.description}</p>
+                                            {/* Card body */}
+                                            <div style={{ padding: '0 14px 10px' }}>
+                                                <p style={{ color: '#ef4444', fontWeight: 700, fontSize: '0.85rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                                    Reason: {report.reason}
+                                                </p>
+                                                <p style={{ color: '#e2e8f0', fontSize: '0.82rem', fontWeight: 500, margin: '0 0 10px', lineHeight: 1.3 }}>
+                                                    "{report.description || 'No additional details provided.'}"
+                                                </p>
+                                            </div>
+
+                                            {/* Target row */}
+                                            <div style={{ margin: '0 14px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#4991ff' }}>feed</span>
+                                                <span style={{ fontSize: '0.78rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    <strong style={{ color: '#cbd5e1' }}>Reported Listing: </strong>
+                                                    {report.targetName || 'Unknown Issue'}
+                                                </span>
+                                            </div>
+
+                                            {/* Action buttons */}
+                                            <div style={{ padding: '0 14px 14px', display: 'flex', gap: 8, marginTop: 'auto' }}>
+                                                <button
+                                                    onClick={() => navigate(`/issue/${report.targetId}`)}
+                                                    style={{ flex: 1, padding: '8px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+                                                >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>visibility</span>
+                                                    View
+                                                </button>
+
+                                                {isPending && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => setReportToDismiss(report.id)}
+                                                            style={{ flex: 1, padding: '8px', borderRadius: 10, background: 'rgba(73,145,255,0.12)', border: '1px solid rgba(73,145,255,0.25)', color: '#4991ff', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+                                                            title="Keep listing active and dismiss report"
+                                                        >
+                                                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                                                            Dismiss
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setReportToDelete({ reportId: report.id, targetId: report.targetId })}
+                                                            style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                            title="Delete the reported listing"
+                                                        >
+                                                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
+                                    );
+                                })}
 
-                                        {/* Target row */}
-                                        <div style={{ margin: '0 14px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#64748b' }}>person</span>
-                                            <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                                                <strong style={{ color: '#cbd5e1' }}>Target: </strong>
-                                                {issue.reporterName} ({category?.label || issue.category})
-                                            </span>
-                                        </div>
-
-                                        {/* Action buttons */}
-                                        <div style={{ padding: '0 14px 14px', display: 'flex', gap: 8 }}>
-                                            {issue.status !== 'resolved' && (
-                                                <button
-                                                    onClick={() => setResolveConfirm(issue.id)}
-                                                    style={{ flex: 1, padding: '8px', borderRadius: 10, background: 'rgba(73,145,255,0.12)', border: '1px solid rgba(73,145,255,0.25)', color: '#4991ff', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
-                                                >
-                                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check</span>
-                                                    Resolve
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => navigate(`/issue/${issue.id}`)}
-                                                style={{ flex: 1, padding: '8px', borderRadius: 10, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10B981', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
-                                            >
-                                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>visibility</span>
-                                                View
-                                            </button>
-                                            <button
-                                                onClick={() => setDeleteConfirm(issue.id)}
-                                                style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                            >
-                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
-                                            </button>
-                                        </div>
+                                {filteredReports.length === 0 && (
+                                    <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px 0', color: '#475569' }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.4 }}>inbox</span>
+                                        No flag reports found in this category
                                     </div>
-                                );
-                            })}
-
-                            {filtered.length === 0 && (
-                                <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px 0', color: '#475569' }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.4 }}>inbox</span>
-                                    No reports in this category
-                                </div>
-                            )}
-                        </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
