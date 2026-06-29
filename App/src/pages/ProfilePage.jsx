@@ -865,7 +865,7 @@ export default function ProfilePage() {
                                         <button 
                                             onClick={() => {
                                                 setShowMenu(false);
-                                                navigate('/onboarding');
+                                                navigate('/onboarding', { state: { forceStep: 1 } });
                                             }}
                                             className="w-full text-left px-[18px] py-[11px] text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 flex items-center gap-3 transition-colors"
                                         >

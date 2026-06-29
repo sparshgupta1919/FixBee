@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import LocationStep from './LocationStep';
 import CommunityStep from './CommunityStep';
 import { useAuth } from '../../context/AuthContext';
@@ -11,7 +12,14 @@ import path4Bg from '../../assets/signin/path-4.svg';
 
 const OnboardingPage = () => {
     const { userProfile } = useAuth();
-    const [step, setStep] = useState(userProfile?.locationGranted ? 2 : 1); // 1 = Location, 2 = Community
+    const location = useLocation();
+    
+    // Default to Location (step 1) if forceStep is passed, otherwise based on profile
+    const initialStep = location.state?.forceStep !== undefined 
+        ? location.state.forceStep 
+        : (userProfile?.locationGranted ? 2 : 1);
+        
+    const [step, setStep] = useState(initialStep); // 1 = Location, 2 = Community
 
     const handleNext = () => {
         setStep(2);
