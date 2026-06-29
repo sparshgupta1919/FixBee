@@ -1,0 +1,40 @@
+/* Custom styles for Onboarding pages to match CampXchange */
+
+.onboarding-container {
+    font-family: var(--font-display);
+}
+
+.honeycomb-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Custom scrollbar hiding */
+.community-step::-webkit-scrollbar {
+    display: none;
+}
+.community-step {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/*
+  Override: signin-bg uses position:fixed globally, but overflow-hidden on
+  onboarding-container clips fixed children. Use absolute instead — the
+  container is already h-[100dvh] w-full so the visual result is identical.
+*/
+.onboarding-container > .signin-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.onboarding-container .campus-selection-page {
+    background-color: transparent;
+}

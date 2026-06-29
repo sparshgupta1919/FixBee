@@ -1,0 +1,32 @@
+# Logs
+App/logs
+App/*.log
+App/npm-debug.log*
+App/yarn-debug.log*
+App/yarn-error.log*
+App/pnpm-debug.log*
+App/lerna-debug.log*
+
+# Node modules & build
+App/node_modules
+App/dist
+App/dist-ssr
+App/*.local
+App/.env
+
+# Firebase
+App/.firebase
+App/firebase-debug.log
+App/firestore-debug.log
+App/ui-debug.log
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
