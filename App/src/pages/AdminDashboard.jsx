@@ -84,18 +84,33 @@ const AdminDashboard = () => {
         );
     }
 
+    /* ── Filter issues by current community ── */
+    const communityIssues = useMemo(() => {
+        if (!userProfile?.societyId) return [];
+        return issues.filter(i => i.societyId === userProfile.societyId);
+    }, [issues, userProfile?.societyId]);
+
+    /* ── Filter flag reports by current community's issues ── */
+    const communityReports = useMemo(() => {
+        if (!userProfile?.societyId) return [];
+        return reports.filter(report => {
+            const targetIssue = issues.find(i => i.id === report.targetId);
+            return targetIssue && targetIssue.societyId === userProfile.societyId;
+        });
+    }, [reports, issues, userProfile?.societyId]);
+
     /* ── Derived stats ── */
     const stats = useMemo(() => ({
-        total:       issues.length,
-        open:        issues.filter(i => i.status === 'open').length,
-        in_progress: issues.filter(i => i.status === 'in_progress').length,
-        resolved:    issues.filter(i => i.status === 'resolved').length,
-    }), [issues]);
+        total:       communityIssues.length,
+        open:        communityIssues.filter(i => i.status === 'open').length,
+        in_progress: communityIssues.filter(i => i.status === 'in_progress').length,
+        resolved:    communityIssues.filter(i => i.status === 'resolved').length,
+    }), [communityIssues]);
 
     /* ── Category breakdown ── */
     const categoryBreakdown = useMemo(() => {
         const map = {};
-        issues.forEach(i => {
+        communityIssues.forEach(i => {
             map[i.category] = (map[i.category] || 0) + 1;
         });
         return Object.entries(map)
@@ -106,21 +121,15 @@ const AdminDashboard = () => {
                 count,
                 label: CATEGORIES.find(c => c.id === id)?.label || id,
                 icon: CATEGORIES.find(c => c.id === id)?.icon || 'place',
-                pct: Math.round((count / issues.length) * 100),
+                pct: Math.round((count / (communityIssues.length || 1)) * 100),
             }));
-    }, [issues]);
-
-    /* ── Filtered issues ── */
-    const filtered = useMemo(() => {
-        if (activeFilter === 'all') return issues;
-        return issues.filter(i => i.status === activeFilter);
-    }, [issues, activeFilter]);
+    }, [communityIssues]);
 
     /* ── Filtered reports ── */
     const filteredReports = useMemo(() => {
-        if (activeReportFilter === 'all') return reports;
-        return reports.filter(r => r.status === activeReportFilter);
-    }, [reports, activeReportFilter]);
+        if (activeReportFilter === 'all') return communityReports;
+        return communityReports.filter(r => r.status === activeReportFilter);
+    }, [communityReports, activeReportFilter]);
 
     /* ── Actions ── */
     const handleResolve = (issueId) => {
@@ -158,7 +167,7 @@ const AdminDashboard = () => {
     };
 
     /* ── TABS ── */
-    const pendingReportsCount = reports.filter(r => r.status === 'pending').length;
+    const pendingReportsCount = communityReports.filter(r => r.status === 'pending').length;
     const tabs = [
         { id: 'overview', label: 'Overview', icon: 'grid_view' },
         { id: 'reports',  label: 'Flag Reports',  icon: 'flag', badge: pendingReportsCount },
@@ -356,7 +365,7 @@ const AdminDashboard = () => {
                         {/* Recent activity */}
                         <div style={{ borderRadius: 16, padding: 16, background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.06)' }}>
                             <p style={{ color: '#cbd5e1', fontWeight: 700, fontSize: '0.9rem', margin: '0 0 12px' }}>Recent Activity</p>
-                            {issues.slice(0, 5).map(issue => {
+                            {communityIssues.slice(0, 5).map(issue => {
                                 const cfg = STATUS_CONFIG[issue.status] || STATUS_CONFIG.open;
                                 return (
                                     <div key={issue.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -371,7 +380,7 @@ const AdminDashboard = () => {
                                     </div>
                                 );
                             })}
-                            {issues.length === 0 && <p style={{ color: '#475569', fontSize: '0.82rem', textAlign: 'center', padding: '12px 0' }}>No reports yet</p>}
+                            {communityIssues.length === 0 && <p style={{ color: '#475569', fontSize: '0.82rem', textAlign: 'center', padding: '12px 0' }}>No reports yet</p>}
                         </div>
                     </div>
                 )}

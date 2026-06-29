@@ -1283,45 +1283,74 @@ const ChatPage = () => {
 
                             <button
                                 onClick={() => navigate('/chats')}
-                                className="relative z-10 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 flex-shrink-0"
+                                className="relative z-10 flex items-center justify-center rounded-full bg-slate-100/80 dark:bg-slate-850 backdrop-blur-md flex-shrink-0 transition-transform active:scale-90"
                                 style={{ width: '36px', height: '36px' }}
                             >
-                                <span className="material-symbols-outlined text-slate-500 dark:text-slate-400" style={{ fontSize: '20px' }}>arrow_back</span>
+                                <span className="material-symbols-outlined text-slate-650 dark:text-slate-350" style={{ fontSize: '18px' }}>arrow_back</span>
                             </button>
-                            <div className="relative z-10">
-                                <h1 className="font-bold text-sm text-slate-900 dark:text-slate-100">Global Forum</h1>
-                                <p className="text-[10px] text-slate-400">Advice, questions & experiences</p>
+                            <div className="relative z-10 flex-1">
+                                <h1 className="font-extrabold text-[15px] text-slate-900 dark:text-white font-outfit tracking-wide flex items-center gap-1.5">
+                                    <span>Global Forum</span>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                </h1>
+                                <p className="text-[9.5px] font-medium text-slate-450 dark:text-slate-450 uppercase tracking-wider">Advice, questions & experiences</p>
                             </div>
                         </div>
 
-                        {/* Search Bar */}
-                        <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800/40 bg-white dark:bg-[#121324] flex-shrink-0">
-                            <div className="flex items-center bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-full px-3 py-1.5">
+                        {/* Search & Filter Section */}
+                        <div className="px-4 py-3 border-b border-slate-100/80 dark:border-slate-850/60 bg-white/70 dark:bg-[#121324]/60 backdrop-blur-md flex-shrink-0 flex flex-col gap-2.5">
+                            <div className="flex items-center bg-slate-50/50 dark:bg-slate-950 border border-slate-200/50 dark:border-slate-800 rounded-2xl px-3.5 py-2 transition-all focus-within:ring-2 focus-within:ring-amber-500/30 focus-within:border-amber-500">
                                 <span className="material-symbols-outlined text-slate-400 mr-2" style={{ fontSize: '18px' }}>search</span>
                                 <input 
                                     type="text"
-                                    placeholder="Search posts..."
+                                    placeholder="Search topics, questions, authors..."
                                     value={forumSearchQuery}
                                     onChange={e => setForumSearchQuery(e.target.value)}
-                                    className="flex-1 bg-transparent border-0 outline-none text-xs text-slate-800 dark:text-slate-100"
+                                    className="flex-1 bg-transparent border-0 outline-none text-[12px] font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400"
                                     style={{ border: 'none', outline: 'none' }}
                                 />
                                 {forumSearchQuery && (
-                                    <button onClick={() => setForumSearchQuery('')} className="text-slate-400 hover:text-slate-600">
+                                    <button onClick={() => setForumSearchQuery('')} className="text-slate-405 hover:text-slate-600 transition-colors">
                                         <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
                                     </button>
                                 )}
                             </div>
+
+                            {/* Honeycomb-themed Quick Filter Tags */}
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar py-0.5">
+                                {[
+                                    { id: 'all', label: 'All Discussions', icon: 'forum' },
+                                    { id: 'trending', label: 'Trending', icon: 'local_fire_department' },
+                                    { id: 'questions', label: 'Questions', icon: 'help_outline' },
+                                ].map(tag => (
+                                    <button
+                                        key={tag.id}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10.5px] font-bold tracking-wide transition-all duration-200 border flex-shrink-0 active:scale-95"
+                                        style={{
+                                            background: forumSearchQuery === tag.label.toLowerCase() ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'transparent',
+                                            borderColor: forumSearchQuery === tag.label.toLowerCase() ? '#D97706' : 'rgba(253, 201, 56, 0.25)',
+                                            color: forumSearchQuery === tag.label.toLowerCase() ? 'white' : '#B45309',
+                                        }}
+                                        onClick={() => {
+                                            if (tag.id === 'all') setForumSearchQuery('');
+                                            else setForumSearchQuery(tag.label);
+                                        }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{tag.icon}</span>
+                                        <span>{tag.label}</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         {/* Post Cards List */}
-                        <div className="flex-1 overflow-y-auto px-4 pb-24 flex flex-col gap-3">
+                        <div className="flex-1 overflow-y-auto px-4 pt-3 pb-24 flex flex-col gap-3.5 no-scrollbar bg-[#f8fafc] dark:bg-[#07080f]">
                             {filteredPosts.length === 0 ? (
-                                <div className="py-12 text-center flex flex-col items-center justify-center opacity-60 bg-white dark:bg-[#121324] border border-slate-100 dark:border-slate-800/40 p-4 rounded-2xl shadow-sm">
-                                    <span className="material-symbols-outlined text-4xl mb-2 text-slate-400">forum</span>
-                                    <p className="font-semibold text-sm text-[#0d1b12] dark:text-white mb-1">No posts found</p>
-                                    <p className="text-xs text-slate-500 max-w-[240px]">
-                                        {forumSearchQuery.trim() ? 'Try another search query.' : 'Be the first to post something in this forum!'}
+                                <div className="py-16 text-center flex flex-col items-center justify-center opacity-70 bg-white dark:bg-[#121324] border border-slate-100 dark:border-slate-800/40 p-6 rounded-3xl shadow-sm">
+                                    <span className="material-symbols-outlined text-5xl mb-3 text-amber-500 animate-pulse">forum</span>
+                                    <p className="font-extrabold text-sm text-slate-900 dark:text-white mb-1.5 font-outfit">No discussions found</p>
+                                    <p className="text-xs text-slate-500 max-w-[260px] leading-relaxed">
+                                        {forumSearchQuery.trim() ? 'No posts matched your search filters. Try a different query.' : 'Welcome! Be the first to share an advice or ask a question.'}
                                     </p>
                                 </div>
                             ) : (
@@ -1331,38 +1360,47 @@ const ChatPage = () => {
                                         <div
                                             key={post.id}
                                             onClick={() => setSelectedPostId(post.id)}
-                                            className="bg-white dark:bg-[#121324] border border-slate-100 dark:border-slate-800/40 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all active:scale-[0.99] cursor-pointer animate-fadeIn"
+                                            className="bg-white dark:bg-[#121324] border border-slate-100/80 dark:border-slate-850/60 rounded-3xl p-5 shadow-[0_4px_16px_rgba(0,0,0,0.02)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.2)] hover:shadow-[0_10px_25px_rgba(253,201,56,0.08)] hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.99] cursor-pointer animate-fadeIn flex flex-col gap-3"
                                         >
-                                            {/* Author */}
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-7 h-7 rounded-full overflow-hidden bg-slate-200 flex-shrink-0">
-                                                    {post.authorPhoto && post.authorPhoto !== 'null' && post.authorPhoto !== 'undefined' ? (
-                                                        <img src={post.authorPhoto} alt="" className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
-                                                    ) : (
-                                                        <div className="w-full h-full bg-primary flex items-center justify-center text-white font-bold text-[10px]">
-                                                            {post.authorName?.[0]?.toUpperCase() || '?'}
-                                                        </div>
-                                                    )}
+                                            {/* Author Row */}
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-2xl overflow-hidden bg-amber-50 dark:bg-amber-950/20 flex-shrink-0 border-2 border-amber-500/20 shadow-inner flex items-center justify-center">
+                                                        {post.authorPhoto && post.authorPhoto !== 'null' && post.authorPhoto !== 'undefined' ? (
+                                                            <img src={post.authorPhoto} alt="" className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
+                                                        ) : (
+                                                            <span className="font-extrabold text-[12px] text-amber-500 font-outfit">
+                                                                {post.authorName?.[0]?.toUpperCase() || '?'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[11.5px] font-bold text-slate-850 dark:text-slate-150 font-outfit tracking-wide">{post.authorName}</p>
+                                                        <p className="text-[9.5px] font-medium text-slate-450 dark:text-slate-450">{timeAgo(post.createdAt)}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="text-[11px] font-semibold text-slate-800 dark:text-slate-200">{post.authorName}</p>
-                                                    <p className="text-[9px] text-slate-400">{timeAgo(post.createdAt)}</p>
+
+                                                {/* Category Badge */}
+                                                <div className="px-2.5 py-1 rounded-lg text-[9px] font-extrabold tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/10 uppercase font-outfit">
+                                                    Discussion
                                                 </div>
                                             </div>
 
-                                            {/* Title & Truncated description */}
-                                            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-2.5 mb-1.5 line-clamp-2">{post.title}</h3>
-                                            <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed whitespace-pre-wrap">{post.description}</p>
+                                            {/* Title & Description */}
+                                            <div>
+                                                <h3 className="text-[13.5px] font-extrabold text-slate-900 dark:text-white mb-1.5 leading-snug font-outfit">{post.title}</h3>
+                                                <p className="text-[11.5px] text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed whitespace-pre-wrap font-medium">{post.description}</p>
+                                            </div>
 
                                             {/* Attached Images Thumbnail */}
                                             {post.imageURLs && post.imageURLs.length > 0 && (
-                                                <div className="mt-2.5 rounded-xl overflow-hidden max-h-56 border border-slate-100 dark:border-slate-800/60 aspect-video bg-slate-50 dark:bg-slate-900">
-                                                    <img src={post.imageURLs[0]} alt="" className="w-full h-full object-cover" />
+                                                <div className="rounded-2xl overflow-hidden max-h-52 border border-slate-100/80 dark:border-slate-800/40 aspect-[16/9] bg-slate-50 dark:bg-slate-950/40 relative shadow-inner">
+                                                    <img src={post.imageURLs[0]} alt="" className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" />
                                                 </div>
                                             )}
 
-                                            {/* Footer details */}
-                                            <div className="flex items-center gap-3 mt-3.5 pt-3 border-t border-slate-50 dark:border-slate-800/20">
+                                            {/* Card Footer Details */}
+                                            <div className="flex items-center gap-3 pt-3 border-t border-slate-50/50 dark:border-slate-800/20">
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -1372,18 +1410,18 @@ const ChatPage = () => {
                                                             navigate('/signin');
                                                         }
                                                     }}
-                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10.5px] font-extrabold transition-all duration-200 border active:scale-95 ${
                                                         hasLiked 
-                                                            ? 'bg-primary/10 text-primary' 
-                                                            : 'bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80'
+                                                            ? 'bg-amber-500 text-white border-amber-500 shadow-sm' 
+                                                            : 'bg-amber-500/5 hover:bg-amber-500/15 border-transparent text-amber-600 dark:text-amber-500'
                                                     }`}
                                                 >
-                                                    <span className="material-symbols-outlined" style={{ fontSize: '15px', fontVariationSettings: hasLiked ? "'FILL' 1" : "'FILL' 0" }}>arrow_upward</span>
-                                                    <span>Upvote {post.upvotes?.length || 0}</span>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '14px', fontVariationSettings: hasLiked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
+                                                    <span>{post.upvotes?.length || 0}</span>
                                                 </button>
 
-                                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400">
-                                                    <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>chat_bubble</span>
+                                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10.5px] font-extrabold bg-slate-50/80 dark:bg-slate-900/60 border border-slate-100/60 dark:border-slate-800/40 text-slate-500 dark:text-slate-400">
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>chat_bubble</span>
                                                     <span>{post.commentCount || 0}</span>
                                                 </div>
                                             </div>
@@ -1393,14 +1431,14 @@ const ChatPage = () => {
                             )}
                         </div>
 
-                        {/* Floating Action Button */}
+                        {/* Glowing Honeycomb Floating Action Button (FAB) */}
                         {currentUser && (
                             <button
                                 onClick={() => setIsCreateModalOpen(true)}
-                                className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-40 flex items-center justify-center gap-1 bg-[#4991ff] hover:bg-[#357ae8] text-white font-bold text-sm px-6 py-3 rounded-full shadow-lg shadow-[#4991ff]/40 active:scale-95 transition-all select-none whitespace-nowrap"
+                                className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-40 flex items-center justify-center gap-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-[12.5px] px-6 py-3 rounded-2xl shadow-lg shadow-amber-500/35 hover:shadow-amber-500/50 active:scale-95 transition-all select-none whitespace-nowrap tracking-wider font-outfit"
                             >
-                                <span className="material-symbols-outlined font-bold" style={{ fontSize: '18px' }}>add</span>
-                                <span>Post</span>
+                                <span className="material-symbols-outlined font-extrabold" style={{ fontSize: '18px' }}>add_comment</span>
+                                <span>START DISCUSSION</span>
                             </button>
                         )}
                     </div>
