@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { db, storage, functions } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
@@ -54,6 +55,81 @@ export function IssueProvider({ children }) {
     const [globalPosts, setGlobalPosts] = useState([]);
     const [issueMessages, setIssueMessages] = useState({});
     const [backgroundTasks, setBackgroundTasks] = useState([]);
+    const [duplicateAlert, setDuplicateAlert] = useState(null); // { matchedIssueId, matchedTitle, reason }
+
+    const dismissDuplicateAlert = useCallback(() => setDuplicateAlert(null), []);
+
+    // Fire-and-forget background duplicate check using Gemini text API
+    // Tries models in order — automatically falls back if a model is rate-limited (429)
+    const checkDuplicateInBackground = useCallback(async ({ title, description, category, societyId }) => {
+        const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+
+        try {
+            const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+            if (!apiKey) return;
+
+            // Only compare against open issues in the same society
+            const candidates = issues
+                .filter(i => i.status !== 'resolved' && (!societyId || i.societyId === societyId))
+                .slice(0, 30)
+                .map(i => ({ id: i.id, title: i.title, description: i.description, category: i.category }));
+
+            if (candidates.length === 0) return;
+
+            const genAI = new GoogleGenerativeAI(apiKey);
+
+            const prompt = `You are a duplicate-detection assistant for "FixBee", a community civic issue reporting app.
+
+A new issue has just been submitted:
+Title: "${title}"
+Category: "${category}"
+Description: "${description}"
+
+Here are existing open issues in the same community:
+${JSON.stringify(candidates)}
+
+Determine if the new issue is a DUPLICATE of any existing one — meaning the SAME physical problem at the same location, not just the same category.
+Only flag as duplicate when you are highly confident.
+
+Return ONLY this raw JSON (no markdown):
+{"isDuplicate": boolean, "matchedIssueId": "string or null", "matchedTitle": "string or null", "reason": "one sentence or null"}`;
+
+            let lastErr = null;
+            for (const modelName of FALLBACK_MODELS) {
+                try {
+                    const model = genAI.getGenerativeModel({
+                        model: modelName,
+                        generationConfig: { responseMimeType: 'application/json' },
+                    });
+                    const result = await model.generateContent(prompt);
+                    const data = JSON.parse(result.response.text());
+
+                    if (data.isDuplicate && data.matchedTitle) {
+                        setDuplicateAlert({
+                            matchedIssueId: data.matchedIssueId,
+                            matchedTitle: data.matchedTitle,
+                            reason: data.reason,
+                        });
+                    }
+                    return; // success — stop trying further models
+                } catch (err) {
+                    const is429 = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('Too Many Requests');
+                    if (is429) {
+                        console.warn(`Duplicate check: ${modelName} rate-limited, trying next model...`);
+                        lastErr = err;
+                        continue; // try next model
+                    }
+                    throw err; // non-429 error — bubble up to outer catch
+                }
+            }
+            // All models exhausted
+            console.warn('Duplicate check: all models rate-limited (non-fatal):', lastErr?.message);
+        } catch (err) {
+            // Non-fatal — silently ignore
+            console.warn('Duplicate check failed (non-fatal):', err.message);
+        }
+    }, [issues]);
+
 
     // Listen to Issues
     useEffect(() => {
@@ -833,6 +909,9 @@ export function IssueProvider({ children }) {
                     setBackgroundTasks(prev => prev.filter(t => t.id !== taskId));
                 }, 4000);
 
+                // Fire-and-forget duplicate check (non-blocking)
+                checkDuplicateInBackground({ title, description, category, societyId: userProfile?.societyId || null });
+
             } catch (err) {
                 console.error("Background submission failed:", err);
                 setBackgroundTasks(prev =>
@@ -846,7 +925,7 @@ export function IssueProvider({ children }) {
                 }, 5000);
             }
         })();
-    }, [addIssue]);
+    }, [addIssue, checkDuplicateInBackground]);
 
     const submitFlashReport = useCallback(async ({
         files,
@@ -979,11 +1058,14 @@ export function IssueProvider({ children }) {
                 setBackgroundTasks(prev =>
                     prev.map(t => t.id === taskId ? { ...t, status: 'success', message: 'Flash Report submitted successfully! 🐝⚡' } : t)
                 );
-                
+
                 // Clear after 4 seconds
                 setTimeout(() => {
                     setBackgroundTasks(prev => prev.filter(t => t.id !== taskId));
                 }, 4000);
+
+                // Fire-and-forget duplicate check (non-blocking)
+                checkDuplicateInBackground({ title, description, category, societyId: userProfile?.societyId || null });
 
             } catch (err) {
                 console.error("Background Flash Report failed:", err);
@@ -996,7 +1078,7 @@ export function IssueProvider({ children }) {
                 }, 5000);
             }
         })();
-    }, [addIssue]);
+    }, [addIssue, checkDuplicateInBackground]);
 
     return (
         <IssueContext.Provider value={{
@@ -1005,6 +1087,8 @@ export function IssueProvider({ children }) {
             globalPosts,
             issueMessages,
             backgroundTasks,
+            duplicateAlert,
+            dismissDuplicateAlert,
             getIssueMessages,
             upvoteIssue,
             addIssue,

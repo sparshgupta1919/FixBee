@@ -45,8 +45,12 @@ const AdminDashboard = () => {
     const [reportToDelete, setReportToDelete] = useState(null); // { reportId, targetId }
     const [reportToDismiss, setReportToDismiss] = useState(null); // reportId
 
-    // Fetch flag reports in real-time
+    /* ── Access guard ── */
+    const isAdmin = userProfile?.role === 'admin' || currentUser?.role === 'admin';
+
+    // Fetch flag reports in real-time — only for admins
     useEffect(() => {
+        if (!isAdmin) return; // don't attempt if not admin — Firestore rules will block it anyway
         const q = query(collection(db, 'reports'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const reportsData = [];
@@ -67,10 +71,7 @@ const AdminDashboard = () => {
         });
 
         return () => unsubscribe();
-    }, []);
-
-    /* ── Access guard ── */
-    const isAdmin = userProfile?.role === 'admin' || currentUser?.role === 'admin';
+    }, [isAdmin]);
     if (!isAdmin) {
         return (
             <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', padding: '24px', background: '#0f1117' }}>

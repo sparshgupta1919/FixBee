@@ -27,7 +27,7 @@ const AppLayout = ({ children }) => {
     const location = useLocation();
     const pagesWithNav = ['/home', '/chats', '/profile', '/map'];
     const showBottomNav = pagesWithNav.some(p => location.pathname === p || location.pathname.startsWith(p));
-    const { backgroundTasks } = useIssues();
+    const { backgroundTasks, duplicateAlert, dismissDuplicateAlert } = useIssues();
 
     return (
         <>
@@ -65,6 +65,80 @@ const AppLayout = ({ children }) => {
                 )}
             </div>
             {showBottomNav && <BottomNav />}
+
+            {/* Duplicate Alert Popup */}
+            {duplicateAlert && (
+                <div
+                    className="fixed z-[10000] animate-slideUp"
+                    style={{
+                        bottom: showBottomNav ? '80px' : '24px',
+                        left: '12px',
+                        right: '12px',
+                    }}
+                >
+                    <div
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(30,20,5,0.97) 0%, rgba(45,28,5,0.97) 100%)',
+                            border: '1.5px solid rgba(245,158,11,0.5)',
+                            borderRadius: '20px',
+                            padding: '16px',
+                            boxShadow: '0 8px 32px rgba(245,158,11,0.2), 0 2px 8px rgba(0,0,0,0.4)',
+                            backdropFilter: 'blur(20px)',
+                        }}
+                    >
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="flex items-center gap-2">
+                                <div style={{
+                                    width: '32px', height: '32px', borderRadius: '10px',
+                                    background: 'rgba(245,158,11,0.15)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    flexShrink: 0,
+                                }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#F59E0B' }}>content_copy</span>
+                                </div>
+                                <span style={{ fontSize: '13px', fontWeight: 700, color: '#F59E0B', letterSpacing: '0.02em' }}>
+                                    Possible Duplicate Detected
+                                </span>
+                            </div>
+                            <button
+                                onClick={dismissDuplicateAlert}
+                                style={{
+                                    width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
+                                    background: 'rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: 'rgba(255,255,255,0.6)' }}>close</span>
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', margin: '0 0 8px 0', lineHeight: 1.5 }}>
+                            Your report may already be covered by an open issue:
+                        </p>
+                        <div style={{
+                            background: 'rgba(245,158,11,0.1)',
+                            border: '1px solid rgba(245,158,11,0.25)',
+                            borderRadius: '10px',
+                            padding: '10px 12px',
+                            marginBottom: '8px',
+                        }}>
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: '#FCD34D', margin: 0 }}>
+                                "{duplicateAlert.matchedTitle}"
+                            </p>
+                        </div>
+                        {duplicateAlert.reason && (
+                            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', margin: 0, lineHeight: 1.5 }}>
+                                {duplicateAlert.reason}
+                            </p>
+                        )}
+                        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '8px', marginBottom: 0 }}>
+                            Your report has still been submitted. Consider upvoting the existing issue instead.
+                        </p>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

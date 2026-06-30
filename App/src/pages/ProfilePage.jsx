@@ -731,8 +731,14 @@ export default function ProfilePage() {
     const { issues, loading, updateIssueStatusWithPhotos, refreshIssue, deleteIssue, editIssue } = useIssues();
     const isAdmin = userProfile?.role === 'admin' || currentUser?.role === 'admin';
 
-    const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
-    useEffect(() => { document.documentElement.classList.toggle('dark', isDark); }, [isDark]);
+    const [isDark, setIsDark] = useState(() => {
+        const saved = localStorage.getItem('fixbee_theme');
+        return saved ? saved === 'dark' : document.documentElement.classList.contains('dark');
+    });
+    useEffect(() => {
+        document.documentElement.classList.toggle('dark', isDark);
+        localStorage.setItem('fixbee_theme', isDark ? 'dark' : 'light');
+    }, [isDark]);
 
     const [activeTab, setActiveTab] = useState(defaultTab || 'unresolved');
     const [imageError, setImageError] = useState(false);
@@ -826,8 +832,8 @@ export default function ProfilePage() {
             style={{ background: 'var(--chat-list-bg)' }}
         >
             <header 
-                className="sticky top-0 z-30 flex-shrink-0 border-b border-slate-200/50 dark:border-slate-800/80 backdrop-blur-xl"
-                style={{ paddingTop: 'var(--safe-area-top)', background: 'var(--header-bg)' }}
+                className="sticky top-0 z-30 flex-shrink-0 border-b border-slate-200/50 dark:border-slate-800/80"
+                style={{ paddingTop: 'var(--safe-area-top)', background: 'transparent' }}
             >
                 <div className="flex items-center justify-between px-4 py-4 max-w-lg mx-auto">
                     <h1 className="text-[22px] font-medium text-[#0d1b12] dark:text-white tracking-tight">Profile</h1>
