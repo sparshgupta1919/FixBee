@@ -300,10 +300,10 @@ const MapPage = () => {
                     </button>
                     <div>
                         <h1 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', fontFamily: 'var(--font-outfit)', lineHeight: 1 }}>
-                            Nearby Issues Map
+                            Community Issues Map
                         </h1>
                         <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginTop: '2px' }}>
-                            Showing issues within 10 km of your community
+                            Showing issues from your community only
                         </p>
                     </div>
                 </div>
