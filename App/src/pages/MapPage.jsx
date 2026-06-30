@@ -140,23 +140,25 @@ const MapPage = () => {
     const userLat = userProfile?.lat || 12.9716;
     const userLng = userProfile?.lng || 77.5946;
 
-    // Filter issues to "nearby" (within 10 km) matching the selected statuses
+    // Filter issues to "nearby" (matching same community only) matching the selected statuses
     const nearbyIssues = useMemo(() => {
+        if (!userProfile?.societyId) return [];
+
         return issues.filter(issue => {
+            // Strictly same community only
+            if (issue.societyId !== userProfile.societyId) return false;
+
             // Apply status filter (unless it's the forced focusIssueId)
             const matchesStatus = selectedStatuses.includes(issue.status);
             if (!matchesStatus && issue.id !== focusIssueId) return false;
 
-            if (focusIssueId && issue.id === focusIssueId) return true;
-
-            // Exclude inactive reports (older than 10 days)
+            // Exclude inactive reports (older than 10 days) (unless it's the forced focusIssueId)
             const isRecent = Date.now() - new Date(issue.createdAt).getTime() < 10 * 24 * 60 * 60 * 1000;
-            if (!isRecent) return false;
+            if (!isRecent && issue.id !== focusIssueId) return false;
 
-            // Same community only
-            return !!(userProfile?.societyId && issue.societyId === userProfile.societyId);
+            return true;
         });
-    }, [issues, userProfile, focusIssueId, selectedStatuses]);
+    }, [issues, userProfile?.societyId, focusIssueId, selectedStatuses]);
 
     const hasOpenedPopup = useRef(false);
 

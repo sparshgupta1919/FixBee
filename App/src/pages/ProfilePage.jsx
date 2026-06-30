@@ -830,7 +830,7 @@ export default function ProfilePage() {
                 style={{ paddingTop: 'var(--safe-area-top)', background: 'var(--header-bg)' }}
             >
                 <div className="flex items-center justify-between px-4 py-4 max-w-lg mx-auto">
-                    <h1 className="text-[22px] font-bold text-[#0d1b12] dark:text-white tracking-tight">Profile</h1>
+                    <h1 className="text-[22px] font-medium text-[#0d1b12] dark:text-white tracking-tight">Profile</h1>
                     <div className="flex items-center gap-4 text-slate-600 dark:text-slate-300">
                         <button onClick={() => setIsDark((d) => !d)} className="transition-transform active:scale-90 flex items-center justify-center p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
                             <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>
@@ -924,7 +924,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Name */}
-                <h2 className="text-[24px] font-semibold text-[#0d1b12] dark:text-white font-outfit">{displayNameToUse}</h2>
+                <h2 className="text-[24px] font-normal text-[#0d1b12] dark:text-white font-outfit">{displayNameToUse}</h2>
 
                 {/* Info Pill */}
                 <div className="mt-3 bg-white dark:bg-surface-dark px-5 py-2.5 rounded-[100px] shadow-[0_2px_10px_rgba(0,0,0,0.03)] dark:shadow-none border border-slate-100 dark:border-slate-800 flex items-center gap-3">
@@ -956,7 +956,7 @@ export default function ProfilePage() {
 
                 {/* Title */}
                 <div className="w-full mt-8 mb-4">
-                    <h3 className="text-[19px] font-bold text-[#0d1b12] dark:text-white font-outfit">My Reports</h3>
+                    <h3 className="text-[19px] font-medium text-[#0d1b12] dark:text-white font-outfit">My Reports</h3>
                 </div>
 
                 {/* Tabs */}
